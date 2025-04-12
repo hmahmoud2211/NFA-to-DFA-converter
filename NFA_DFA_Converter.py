@@ -70,46 +70,95 @@ class NFA:
             
         G = nx.DiGraph()
         
-        # Add nodes
+        # Add nodes with improved styling
         for state in self.states:
-            node_color = 'lightblue'
             if state == self.start_state:
-                node_color = 'lightgreen'
-            if state in self.final_states:
-                node_color = 'lightcoral'
-            if state == self.start_state and state in self.final_states:
-                node_color = 'lightyellow'
+                node_color = '#C8E6C9'  # Light green for start state
+            elif state in self.final_states:
+                node_color = '#FFCDD2'  # Light red for final states
+            else:
+                node_color = 'white'  # White for other states
                 
             G.add_node(state, color=node_color)
         
         # Add edges with proper transition labels
-        for (from_state, symbol), to_states in self.transition_function.items():
+        edge_colors = []
+        edge_styles = []
+        
+        # Sort transitions for consistent visualization
+        sorted_transitions = sorted(self.transition_function.items(), 
+                                 key=lambda x: (x[0][0], x[0][1]))
+        
+        # Track edges between same nodes to adjust their curves
+        edge_count = {}
+        
+        for (from_state, symbol), to_states in sorted_transitions:
             for to_state in to_states:
-                # Convert symbol to string and handle special characters
-                symbol_str = str(symbol)
-                if symbol_str == 'ε':
-                    symbol_str = 'ε'
-                elif symbol_str == '0':
-                    symbol_str = '0'
-                G.add_edge(from_state, to_state, label=symbol_str)
+                # Create a unique edge key
+                edge_key = (from_state, to_state)
+                if edge_key not in edge_count:
+                    edge_count[edge_key] = 0
+                edge_count[edge_key] += 1
+                
+                # Calculate curve based on number of edges between these nodes
+                curve = 0.2 * edge_count[edge_key]
+                
+                # Add the edge with the exact symbol from transition function
+                G.add_edge(from_state, to_state, 
+                          label=str(symbol),  # Convert symbol to string to ensure proper display
+                          connectionstyle=f'arc3,rad={curve}')
+                
+                # Set edge style based on symbol type
+                if symbol == 'ε':
+                    edge_colors.append('#9E9E9E')  # Gray for ε-transitions
+                    edge_styles.append('dashed')
+                else:
+                    edge_colors.append('#2196F3')  # Blue for normal transitions
+                    edge_styles.append('solid')
         
         # Create the plot
         plt.figure(figsize=(10, 6))
-        pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
+        pos = nx.spring_layout(G, k=2, iterations=50)
         
         # Draw nodes
         node_colors = [G.nodes[node]['color'] for node in G.nodes()]
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=700)
+        nx.draw_networkx_nodes(G, pos, 
+                             node_color=node_colors, 
+                             node_size=1000,
+                             edgecolors='#424242', 
+                             linewidths=2)
         
-        # Draw edges with proper arrow style
-        nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=20)
+        # Draw edges with different styles for ε-transitions
+        edges = G.edges()
+        for i, (u, v) in enumerate(edges):
+            edge_style = edge_styles[i]
+            edge_color = edge_colors[i]
+            nx.draw_networkx_edges(G, pos,
+                                 edgelist=[(u, v)],
+                                 edge_color=edge_color,
+                                 style=edge_style,
+                                 arrows=True,
+                                 arrowsize=20,
+                                 width=2,
+                                 connectionstyle=G.edges[u, v]['connectionstyle'])
         
         # Draw labels
-        nx.draw_networkx_labels(G, pos, font_size=12, font_weight='bold')
-        edge_labels = nx.get_edge_attributes(G, 'label')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=10)
+        nx.draw_networkx_labels(G, pos, 
+                              font_size=14, 
+                              font_weight='bold')
         
-        plt.title(title)
+        # Draw edge labels with better positioning and background
+        edge_labels = nx.get_edge_attributes(G, 'label')
+        nx.draw_networkx_edge_labels(G, pos,
+                                   edge_labels=edge_labels,
+                                   font_size=12,
+                                   font_weight='bold',
+                                   bbox=dict(facecolor='white', 
+                                           edgecolor='none', 
+                                           alpha=0.8,
+                                           pad=0.5))
+        
+        plt.title(title, fontsize=16, pad=20)
         plt.axis('off')
         
         return plt.gcf()
@@ -134,154 +183,245 @@ class DFA:
             
         G = nx.DiGraph()
         
-        # Add nodes
-        for state in self.states:
-            state_str = str(state)
-            node_color = 'lightblue'
-            if state == self.start_state:
-                node_color = 'lightgreen'
-            if state in self.final_states:
-                node_color = 'lightcoral'
-            if state == self.start_state and state in self.final_states:
-                node_color = 'lightyellow'
-                
-            G.add_node(state_str, color=node_color)
+        # Helper function to format state labels
+        def format_state_label(state):
+            if isinstance(state, frozenset):
+                return '{' + ', '.join(sorted(state)) + '}'
+            return str(state)
         
-        # Add edges
+        # Add nodes with improved styling
+        for state in self.states:
+            node_color = '#E1F5FE'  # Light blue
+            if state == self.start_state:
+                node_color = '#C8E6C9'  # Light green
+            if state in self.final_states:
+                node_color = '#FFCDD2'  # Light red
+            if state == self.start_state and state in self.final_states:
+                node_color = '#FFF9C4'  # Light yellow
+                
+            # Use the formatted label for the node
+            state_label = format_state_label(state)
+            G.add_node(state_label, color=node_color)
+        
+        # Add edges with proper transition labels
+        edge_colors = []
+        edge_styles = []
         for (from_state, symbol), to_state in self.transition_function.items():
             if to_state:  # Only add if there's a valid transition
-                G.add_edge(str(from_state), str(to_state), label=symbol)
+                from_label = format_state_label(from_state)
+                to_label = format_state_label(to_state)
+                G.add_edge(from_label, to_label, label=symbol)
+                edge_colors.append('#2196F3')  # Blue for transitions
+                edge_styles.append('solid')
         
         # Create the plot
-        plt.figure(figsize=(10, 6))
-        pos = nx.spring_layout(G, seed=42)
+        plt.figure(figsize=(12, 8))
+        
+        # Use a more spread out layout
+        pos = nx.spring_layout(G, k=2, iterations=50)
         
         # Draw nodes
         node_colors = [G.nodes[node]['color'] for node in G.nodes()]
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=700)
+        nx.draw_networkx_nodes(G, pos, 
+                             node_color=node_colors,
+                             node_size=3000,  # Larger nodes
+                             edgecolors='#424242',
+                             linewidths=2)
         
-        # Draw edges
-        nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=20)
+        # Draw edges with different styles
+        edges = G.edges()
+        for i, (u, v) in enumerate(edges):
+            edge_style = edge_styles[i]
+            edge_color = edge_colors[i]
+            nx.draw_networkx_edges(G, pos,
+                                 edgelist=[(u, v)],
+                                 edge_color=edge_color,
+                                 style=edge_style,
+                                 arrows=True,
+                                 arrowsize=20,
+                                 width=2,
+                                 arrowstyle='->',
+                                 connectionstyle='arc3,rad=0.2')
         
-        # Draw labels
-        nx.draw_networkx_labels(G, pos, font_size=12, font_weight='bold')
+        # Draw labels with word wrapping for long state names
+        labels = {}
+        for node in G.nodes():
+            # Split long labels into multiple lines
+            label = str(node)
+            if len(label) > 20:
+                words = label.split(', ')
+                new_label = ''
+                line = ''
+                for word in words:
+                    if len(line + word) > 20:
+                        new_label += line + '\n'
+                        line = word + ', '
+                    else:
+                        line += word + ', '
+                new_label += line.rstrip(', ')
+                labels[node] = new_label
+            else:
+                labels[node] = label
+                
+        nx.draw_networkx_labels(G, pos,
+                              labels=labels,
+                              font_size=10,
+                              font_weight='bold')
+        
+        # Draw edge labels
         edge_labels = nx.get_edge_attributes(G, 'label')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=10)
+        nx.draw_networkx_edge_labels(G, pos,
+                                   edge_labels=edge_labels,
+                                   font_size=12,
+                                   font_weight='bold')
         
-        plt.title(title)
+        plt.title(title, fontsize=16, pad=20)
         plt.axis('off')
         
         return plt.gcf()
     
     def minimize(self):
-        """Minimize the DFA using the partitioning algorithm"""
-        # Step 1: Remove unreachable states
-        reachable = {self.start_state}
-        stack = [self.start_state]
-        
-        while stack:
-            state = stack.pop()
-            for symbol in self.alphabet:
-                next_state = self.transition_function.get((state, symbol))
-                if next_state and next_state not in reachable:
-                    reachable.add(next_state)
-                    stack.append(next_state)
-        
-        # Step 2: Find equivalent states
-        # Initial partition: final and non-final states
-        partitions = [reachable.intersection(self.final_states), 
-                     reachable - self.final_states]
-        partitions = [p for p in partitions if p]  # Remove empty partitions
-        
-        # Refine partitions
-        while True:
-            new_partitions = []
-            for partition in partitions:
-                if len(partition) <= 1:
-                    new_partitions.append(partition)
-                    continue
-                
-                # Split partition based on transitions
-                splits = {}
-                for state in partition:
-                    key = tuple()
-                    for symbol in self.alphabet:
-                        next_state = self.transition_function.get((state, symbol))
-                        # Find which partition contains the next state
-                        for i, p in enumerate(partitions):
-                            if next_state in p:
-                                key += (i,)
-                                break
-                    
-                    if key not in splits:
-                        splits[key] = set()
-                    splits[key].add(state)
-                
-                new_partitions.extend(splits.values())
-            
-            if len(new_partitions) == len(partitions):
-                break
-            partitions = new_partitions
-        
-        # Step 3: Build minimized DFA
-        min_states = {frozenset(p) for p in partitions}
-        min_start = None
-        min_final = set()
-        min_transitions = {}
-        
-        # Find start and final states
-        for partition in partitions:
-            if self.start_state in partition:
-                min_start = frozenset(partition)
-            if any(s in self.final_states for s in partition):
-                min_final.add(frozenset(partition))
-        
-        # Build transitions
-        for partition in partitions:
-            state = next(iter(partition))  # Take any state from the partition
-            for symbol in self.alphabet:
-                next_state = self.transition_function.get((state, symbol))
-                if next_state:
-                    # Find which partition contains the next state
-                    for p in partitions:
-                        if next_state in p:
-                            min_transitions[(frozenset(partition), symbol)] = frozenset(p)
-                            break
-        
-        return DFA(min_states, self.alphabet, min_transitions, min_start, min_final)
+        """Minimize the DFA using Hopcroft's algorithm"""
+        return minimize_dfa(self)
 
 def nfa_to_dfa(nfa: NFA) -> DFA:
-    start_closure = nfa.epsilon_closure(str(nfa.start_state))
-    dfa_states = {frozenset(str(s) for s in start_closure)}
-    dfa_start_state = frozenset(str(s) for s in start_closure)
+    """Convert NFA to DFA using subset construction algorithm"""
+    # Get epsilon closure of start state
+    start_closure = nfa.epsilon_closure(nfa.start_state)
+    dfa_states = {frozenset(start_closure)}
+    dfa_start_state = frozenset(start_closure)
     dfa_final_states = set()
     dfa_transitions = {}
-    unprocessed_states = [frozenset(str(s) for s in start_closure)]
+    unprocessed_states = [frozenset(start_closure)]
+
+    # If any state in epsilon closure of start state is final, add to DFA final states
+    if any(state in nfa.final_states for state in start_closure):
+        dfa_final_states.add(frozenset(start_closure))
 
     while unprocessed_states:
-        current = unprocessed_states.pop()
+        current_states = unprocessed_states.pop(0)
+        
+        # For each input symbol (excluding epsilon)
         for symbol in nfa.alphabet:
-            symbol = str(symbol)
+            if symbol == 'ε':
+                continue
+                
             next_states = set()
-            for state in current:
-                state = str(state)
-                next_states.update(nfa.transition_function.get((state, symbol), set()))
-            closure = set()
-            for state in next_states:
-                state = str(state)
-                closure.update(nfa.epsilon_closure(state))
-            closure = frozenset(str(s) for s in closure)
+            # For each NFA state in the current DFA state
+            for state in current_states:
+                # Get states reachable by symbol
+                if (state, symbol) in nfa.transition_function:
+                    # Get direct transitions
+                    direct_states = nfa.transition_function[(state, symbol)]
+                    # For each direct state, add its epsilon closure
+                    for direct_state in direct_states:
+                        next_states.update(nfa.epsilon_closure(direct_state))
 
-            if closure and closure not in dfa_states:
-                dfa_states.add(closure)
-                unprocessed_states.append(closure)
+            if next_states:  # Only add if there are reachable states
+                next_state_set = frozenset(next_states)
+                
+                # Add to DFA states if new
+                if next_state_set not in dfa_states:
+                    dfa_states.add(next_state_set)
+                    unprocessed_states.append(next_state_set)
+                    # Check if this new state should be final
+                    if any(state in nfa.final_states for state in next_states):
+                        dfa_final_states.add(next_state_set)
+                
+                # Add transition
+                dfa_transitions[(current_states, symbol)] = next_state_set
 
-            dfa_transitions[(current, symbol)] = closure
+    # Remove epsilon from alphabet
+    dfa_alphabet = {s for s in nfa.alphabet if s != 'ε'}
 
-            if closure and any(str(s) in nfa.final_states for s in closure):
-                dfa_final_states.add(closure)
+    # Simplify state names for better readability
+    state_map = {}
+    for i, state in enumerate(dfa_states):
+        state_map[state] = f"q{i}"
 
-    return DFA(dfa_states, nfa.alphabet, dfa_transitions, dfa_start_state, dfa_final_states)
+    # Create new DFA with simplified state names
+    new_states = set(state_map.values())
+    new_transitions = {}
+    for (state, symbol), next_state in dfa_transitions.items():
+        new_transitions[(state_map[state], symbol)] = state_map[next_state]
+    new_start = state_map[dfa_start_state]
+    new_finals = {state_map[s] for s in dfa_final_states}
+
+    return DFA(new_states, dfa_alphabet, new_transitions, new_start, new_finals)
+
+def minimize_dfa(dfa: DFA) -> DFA:
+    """Minimize DFA using Hopcroft's algorithm"""
+    # Step 1: Create initial partition (final and non-final states)
+    final = frozenset(dfa.final_states)
+    non_final = frozenset(s for s in dfa.states if s not in dfa.final_states)
+    partitions = {final, non_final} if non_final else {final}
+    
+    # Remove empty sets
+    partitions = {p for p in partitions if p}
+    
+    # Step 2: Refine partitions until no more refinement is possible
+    while True:
+        new_partitions = set()
+        changed = False
+        
+        for partition in partitions:
+            # For each symbol in the alphabet
+            for symbol in dfa.alphabet:
+                # Group states by their transitions
+                transition_groups = {}
+                for state in partition:
+                    # Find which partition contains the destination state
+                    dest_state = dfa.transition_function.get((state, symbol))
+                    if dest_state is not None:
+                        dest_partition = None
+                        for p in partitions:
+                            if dest_state in p:
+                                dest_partition = p
+                                break
+                        # Group states by their destination partitions
+                        key = dest_partition
+                        if key not in transition_groups:
+                            transition_groups[key] = set()
+                        transition_groups[key].add(state)
+                
+                # If states were split into multiple groups
+                if len(transition_groups) > 1:
+                    new_partitions.update(frozenset(group) for group in transition_groups.values())
+                    changed = True
+                    break
+            if changed:
+                # Add remaining partitions
+                new_partitions.update(p for p in partitions if p != partition)
+                break
+        
+        if not changed:
+            break
+            
+        partitions = new_partitions
+    
+    # Step 3: Create the minimized DFA
+    # Create a mapping from old states to their partition representative
+    state_map = {}
+    for i, partition in enumerate(partitions):
+        rep = f"q{i}"  # Use simple state names
+        for state in partition:
+            state_map[state] = rep
+    
+    # Create new transition function
+    new_transitions = {}
+    for (state, symbol), next_state in dfa.transition_function.items():
+        new_state = state_map[state]
+        new_next = state_map[next_state]
+        new_transitions[(new_state, symbol)] = new_next
+    
+    # Create new states set
+    new_states = set(state_map.values())
+    
+    # Map start and final states
+    new_start = state_map[dfa.start_state]
+    new_finals = {state_map[s] for s in dfa.final_states}
+    
+    return DFA(new_states, dfa.alphabet, new_transitions, new_start, new_finals)
 
 class ThompsonNFA:
     """Class for building NFAs using Thompson's construction"""
@@ -469,15 +609,47 @@ class NFAToDFAConverter:
         self.root = tk.Tk()
         self.root.title("NFA to DFA Converter")
         self.root.geometry("1200x800")
-        self.root.configure(bg="#f0f0f0")
+        self.root.configure(bg="#f5f5f5")
         
+        # Configure styles
         self.style = ttk.Style()
-        self.style.configure("TLabel", background="#f0f0f0")
-        self.style.configure("TButton", padding=5)
-        self.style.configure("TLabelframe", background="#f0f0f0")
-        self.style.configure("TLabelframe.Label", background="#f0f0f0", font=("Arial", 10, "bold"))
-        self.style.configure("Treeview", background="#ffffff", fieldbackground="#ffffff")
-        self.style.configure("Treeview.Heading", font=("Arial", 10, "bold"))
+        self.style.theme_use('clam')  # Use clam theme for modern look
+        
+        # Configure colors
+        self.style.configure("TFrame", background="#f5f5f5")
+        self.style.configure("TLabel", background="#f5f5f5", font=("Segoe UI", 10))
+        self.style.configure("TButton", 
+                           background="#2196F3", 
+                           foreground="white",
+                           padding=10,
+                           font=("Segoe UI", 10))
+        self.style.configure("TLabelframe", 
+                           background="#f5f5f5",
+                           borderwidth=0)
+        self.style.configure("TLabelframe.Label", 
+                           background="#f5f5f5",
+                           font=("Segoe UI", 11, "bold"))
+        self.style.configure("Treeview", 
+                           background="white",
+                           fieldbackground="white",
+                           font=("Segoe UI", 10))
+        self.style.configure("Treeview.Heading", 
+                           font=("Segoe UI", 10, "bold"))
+        self.style.configure("TNotebook", 
+                           background="#f5f5f5",
+                           borderwidth=0)
+        self.style.configure("TNotebook.Tab", 
+                           background="#e0e0e0",
+                           padding=[10, 5],
+                           font=("Segoe UI", 10))
+        self.style.map("TNotebook.Tab",
+                      background=[("selected", "#2196F3")],
+                      foreground=[("selected", "white")])
+        
+        # Configure hover effects for buttons
+        self.style.map("TButton",
+                      background=[("active", "#1976D2")],
+                      foreground=[("active", "white")])
         
         self.transitions = {}
         self.saved_configs = []
@@ -516,7 +688,7 @@ class NFAToDFAConverter:
     def create_widgets(self):
         # Create main container with paned window for resizable sections
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
-        main_paned.pack(fill="both", expand=True, padx=10, pady=5)
+        main_paned.pack(fill="both", expand=True, padx=20, pady=10)
         
         # Left panel for input
         left_frame = ttk.Frame(main_paned)
@@ -525,9 +697,9 @@ class NFAToDFAConverter:
         # Right panel for output and visualization
         right_frame = ttk.Frame(main_paned)
         main_paned.add(right_frame, weight=1)
-        
+
         # Input Frame
-        input_frame = ttk.LabelFrame(left_frame, text="NFA Definition", padding=10)
+        input_frame = ttk.LabelFrame(left_frame, text="NFA Definition", padding=15)
         input_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         # Create notebook for different input methods
@@ -544,7 +716,11 @@ class NFAToDFAConverter:
 
         # Basic info frame for manual input
         basic_frame = ttk.Frame(manual_frame)
-        basic_frame.pack(fill="x", pady=5)
+        basic_frame.pack(fill="x", pady=10)
+
+        # Create a modern input style
+        input_style = {"width": 30, "font": ("Segoe UI", 10)}
+        label_style = {"font": ("Segoe UI", 10, "bold")}
 
         labels = [
             ("States (comma-separated):", "entry_states"),
@@ -556,74 +732,95 @@ class NFAToDFAConverter:
         self.entries = {}
         for i, (label_text, entry_name) in enumerate(labels):
             frame = ttk.Frame(basic_frame)
-            frame.pack(fill="x", pady=2)
-            ttk.Label(frame, text=label_text, width=20).pack(side="left")
-            entry = ttk.Entry(frame)
+            frame.pack(fill="x", pady=5)
+            ttk.Label(frame, text=label_text, **label_style).pack(side="left", padx=(0, 10))
+            entry = ttk.Entry(frame, **input_style)
             entry.pack(side="left", fill="x", expand=True)
             self.entries[entry_name] = entry
-            
+
             # Add event binding for states and alphabet
             if entry_name in ["entry_states", "entry_alphabet"]:
                 entry.bind('<KeyRelease>', self.on_input_changed)
 
         # Transitions Frame for manual input
-        trans_frame = ttk.LabelFrame(manual_frame, text="Transitions", padding=10)
-        trans_frame.pack(fill="both", expand=True, pady=5)
+        trans_frame = ttk.LabelFrame(manual_frame, text="Transitions", padding=15)
+        trans_frame.pack(fill="both", expand=True, pady=10)
 
-        # Transition input controls
+        # Transition input controls with modern style
         trans_control_frame = ttk.Frame(trans_frame)
-        trans_control_frame.pack(fill="x", pady=5)
+        trans_control_frame.pack(fill="x", pady=10)
 
-        ttk.Label(trans_control_frame, text="From State:").pack(side="left", padx=2)
-        self.from_state = ttk.Combobox(trans_control_frame, width=10)
-        self.from_state.pack(side="left", padx=2)
-
-        ttk.Label(trans_control_frame, text="Symbol:").pack(side="left", padx=2)
-        self.symbol = ttk.Combobox(trans_control_frame, width=5)
-        self.symbol.pack(side="left", padx=2)
-
-        ttk.Label(trans_control_frame, text="To State(s):").pack(side="left", padx=2)
-        self.to_states = ttk.Entry(trans_control_frame, width=15)
-        self.to_states.pack(side="left", padx=2)
-
-        add_btn = ttk.Button(trans_control_frame, text="Add Transition", command=self.add_transition)
-        add_btn.pack(side="left", padx=5)
+        # Create modern comboboxes
+        combo_style = {"width": 15, "font": ("Segoe UI", 10)}
         
-        delete_btn = ttk.Button(trans_control_frame, text="Delete Selected", command=self.delete_transition)
+        ttk.Label(trans_control_frame, text="From State:", **label_style).pack(side="left", padx=5)
+        self.from_state = ttk.Combobox(trans_control_frame, **combo_style)
+        self.from_state.pack(side="left", padx=5)
+
+        ttk.Label(trans_control_frame, text="Symbol:", **label_style).pack(side="left", padx=5)
+        self.symbol = ttk.Combobox(trans_control_frame, width=8, font=("Segoe UI", 10))
+        self.symbol.pack(side="left", padx=5)
+
+        ttk.Label(trans_control_frame, text="To State(s):", **label_style).pack(side="left", padx=5)
+        self.to_states = ttk.Entry(trans_control_frame, width=20, font=("Segoe UI", 10))
+        self.to_states.pack(side="left", padx=5)
+
+        # Modern buttons
+        button_frame = ttk.Frame(trans_control_frame)
+        button_frame.pack(side="left", padx=10)
+        
+        add_btn = ttk.Button(button_frame, text="Add Transition", command=self.add_transition)
+        add_btn.pack(side="left", padx=5)
+
+        delete_btn = ttk.Button(button_frame, text="Delete Selected", command=self.delete_transition)
         delete_btn.pack(side="left", padx=5)
 
-        # Transition display
-        self.trans_tree = ttk.Treeview(trans_frame, columns=("from", "symbol", "to"), show="headings")
+        # Transition display with modern style
+        self.trans_tree = ttk.Treeview(trans_frame, columns=("from", "symbol", "to"), 
+                                     show="headings", height=8)
         self.trans_tree.heading("from", text="From State")
         self.trans_tree.heading("symbol", text="Symbol")
         self.trans_tree.heading("to", text="To State(s)")
         self.trans_tree.pack(fill="both", expand=True)
-        
+
         # Add scrollbar to treeview
         scrollbar = ttk.Scrollbar(trans_frame, orient="vertical", command=self.trans_tree.yview)
         scrollbar.pack(side="right", fill="y")
         self.trans_tree.configure(yscrollcommand=scrollbar.set)
 
-        # Thompson construction frame
+        # Thompson construction frame with modern style
         thompson_input_frame = ttk.Frame(thompson_frame)
-        thompson_input_frame.pack(fill="x", pady=5)
+        thompson_input_frame.pack(fill="x", pady=20)
 
-        ttk.Label(thompson_input_frame, text="Regular Expression:").pack(side="left", padx=5)
-        self.regex_entry = ttk.Entry(thompson_input_frame, width=40)
+        ttk.Label(thompson_input_frame, text="Regular Expression:", 
+                 font=("Segoe UI", 11, "bold")).pack(side="left", padx=5)
+        self.regex_entry = ttk.Entry(thompson_input_frame, width=40, font=("Segoe UI", 10))
         self.regex_entry.pack(side="left", padx=5)
 
-        ttk.Button(thompson_input_frame, text="Build NFA", command=self.build_thompson_nfa).pack(side="left", padx=5)
+        ttk.Button(thompson_input_frame, text="Build NFA", 
+                  command=self.build_thompson_nfa).pack(side="left", padx=5)
 
-        # Buttons Frame
+        # Buttons Frame with modern style
         btn_frame = ttk.Frame(left_frame)
-        btn_frame.pack(fill="x", padx=10, pady=5)
-        ttk.Button(btn_frame, text="Convert", command=self.convert).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Clear", command=self.clear).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Save Configuration", command=self.save_current_config).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Load Configuration", command=self.load_config).pack(side="left", padx=5)
+        btn_frame.pack(fill="x", padx=10, pady=10)
+        
+        # Create modern action buttons
+        convert_btn = ttk.Button(btn_frame, text="Convert", command=self.convert)
+        convert_btn.pack(side="left", padx=5)
+        
+        clear_btn = ttk.Button(btn_frame, text="Clear", command=self.clear)
+        clear_btn.pack(side="left", padx=5)
+        
+        save_btn = ttk.Button(btn_frame, text="Save Configuration", 
+                            command=self.save_current_config)
+        save_btn.pack(side="left", padx=5)
+        
+        load_btn = ttk.Button(btn_frame, text="Load Configuration", 
+                            command=self.load_config)
+        load_btn.pack(side="left", padx=5)
         
         # Right panel content
-        # Notebook for tabs
+        # Notebook for tabs with modern style
         self.notebook = ttk.Notebook(right_frame)
         self.notebook.pack(fill="both", expand=True, padx=5, pady=5)
         
@@ -631,27 +828,31 @@ class NFAToDFAConverter:
         text_frame = ttk.Frame(self.notebook)
         self.notebook.add(text_frame, text="Text Output")
         
-        self.result_text = scrolledtext.ScrolledText(text_frame, height=15, wrap=tk.WORD)
-        self.result_text.pack(fill="both", expand=True)
+        self.result_text = scrolledtext.ScrolledText(text_frame, height=15, 
+                                                   wrap=tk.WORD, font=("Segoe UI", 10))
+        self.result_text.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Visualization tab (only if visualization is available)
         if VISUALIZATION_AVAILABLE:
             viz_frame = ttk.Frame(self.notebook)
             self.notebook.add(viz_frame, text="Visualization")
             
-            # Visualization controls
+            # Visualization controls with modern style
             viz_control_frame = ttk.Frame(viz_frame)
-            viz_control_frame.pack(fill="x", pady=5)
+            viz_control_frame.pack(fill="x", pady=10)
             
-            ttk.Label(viz_control_frame, text="Select Automaton:").pack(side="left", padx=5)
-            self.viz_type = ttk.Combobox(viz_control_frame, values=["NFA", "DFA", "Minimized DFA"], width=15)
+            ttk.Label(viz_control_frame, text="Select Automaton:", 
+                     font=("Segoe UI", 11, "bold")).pack(side="left", padx=5)
+            self.viz_type = ttk.Combobox(viz_control_frame, 
+                                        values=["NFA", "DFA", "Minimized DFA"], 
+                                        width=15, font=("Segoe UI", 10))
             self.viz_type.set("NFA")
             self.viz_type.pack(side="left", padx=5)
             self.viz_type.bind("<<ComboboxSelected>>", self.update_visualization)
             
             # Canvas for visualization
             self.viz_canvas_frame = ttk.Frame(viz_frame)
-            self.viz_canvas_frame.pack(fill="both", expand=True, pady=5)
+            self.viz_canvas_frame.pack(fill="both", expand=True, pady=10)
         else:
             # Create a message frame for when visualization is not available
             viz_frame = ttk.Frame(self.notebook)
@@ -660,30 +861,35 @@ class NFAToDFAConverter:
             message_frame = ttk.Frame(viz_frame)
             message_frame.pack(fill="both", expand=True, pady=20)
             
-            ttk.Label(message_frame, text="Visualization is not available", font=("Arial", 12, "bold")).pack(pady=10)
+            ttk.Label(message_frame, text="Visualization is not available", 
+                     font=("Segoe UI", 12, "bold")).pack(pady=10)
             ttk.Label(message_frame, text="To enable visualization, install the required packages:").pack()
             ttk.Label(message_frame, text="pip install matplotlib networkx").pack(pady=5)
             
             # Create a button to open the requirements file
-            ttk.Button(message_frame, text="View Requirements", command=self.show_requirements).pack(pady=10)
+            ttk.Button(message_frame, text="View Requirements", 
+                      command=self.show_requirements).pack(pady=10)
         
-        # Test string tab
+        # Test string tab with modern style
         test_frame = ttk.Frame(self.notebook)
         self.notebook.add(test_frame, text="Test String")
         
-        # Test string input
+        # Test string input with modern style
         test_input_frame = ttk.Frame(test_frame)
-        test_input_frame.pack(fill="x", pady=5)
+        test_input_frame.pack(fill="x", pady=10)
         
-        ttk.Label(test_input_frame, text="Enter string to test:").pack(side="left", padx=5)
-        self.test_string = ttk.Entry(test_input_frame, width=30)
+        ttk.Label(test_input_frame, text="Enter string to test:", 
+                 font=("Segoe UI", 11, "bold")).pack(side="left", padx=5)
+        self.test_string = ttk.Entry(test_input_frame, width=30, font=("Segoe UI", 10))
         self.test_string.pack(side="left", padx=5)
         
-        ttk.Button(test_input_frame, text="Test", command=self.test_string_accepted).pack(side="left", padx=5)
+        ttk.Button(test_input_frame, text="Test", 
+                  command=self.test_string_accepted).pack(side="left", padx=5)
         
-        # Test result
-        self.test_result = scrolledtext.ScrolledText(test_frame, height=5, wrap=tk.WORD)
-        self.test_result.pack(fill="both", expand=True, pady=5)
+        # Test result with modern style
+        self.test_result = scrolledtext.ScrolledText(test_frame, height=5, 
+                                                   wrap=tk.WORD, font=("Segoe UI", 10))
+        self.test_result.pack(fill="both", expand=True, padx=10, pady=10)
 
     def show_requirements(self):
         """Show the requirements.txt file"""
@@ -907,23 +1113,57 @@ class NFAToDFAConverter:
             self.current_dfa = nfa_to_dfa(self.current_nfa)
             self.current_min_dfa = self.current_dfa.minimize()
 
+            # Helper function to format state sets
+            def format_state_set(state_set):
+                if isinstance(state_set, frozenset):
+                    return '{' + ', '.join(sorted(state_set)) + '}'
+                return str(state_set)
+
+            # Format DFA output
             result = "DFA Conversion Result:\n\n"
-            result += f"States: {set(str(s) for s in self.current_dfa.states)}\n"
-            result += f"Alphabet: {self.current_dfa.alphabet}\n"
-            result += f"Start State: {str(self.current_dfa.start_state)}\n"
-            result += f"Final States: {set(str(s) for s in self.current_dfa.final_states)}\n"
-            result += "Transitions:\n"
-            for (state, symbol), next_state in self.current_dfa.transition_function.items():
-                result += f"  {str(state)} --{symbol}--> {str(next_state)}\n"
+            result += f"States: {{{', '.join(format_state_set(s) for s in self.current_dfa.states)}}}\n"
+            result += f"Alphabet: {{{', '.join(sorted(self.current_dfa.alphabet))}}}\n"
+            result += f"Start State: {format_state_set(self.current_dfa.start_state)}\n"
+            result += f"Final States: {{{', '.join(format_state_set(s) for s in self.current_dfa.final_states)}}}\n\n"
+            
+            # Create transition table for DFA
+            result += "Transition Table:\n"
+            # Header
+            result += "+------------------------------+---------------+------------------------------+\n"
+            result += "|          From State          |    Symbol    |           To State          |\n"
+            result += "+------------------------------+---------------+------------------------------+\n"
+            
+            # Sort transitions for better readability
+            sorted_transitions = sorted(self.current_dfa.transition_function.items(), 
+                                     key=lambda x: (str(x[0][0]), x[0][1]))
+            
+            # Add transitions
+            for (state, symbol), next_state in sorted_transitions:
+                result += f"|{format_state_set(state):^30}|{symbol:^15}|{format_state_set(next_state):^30}|\n"
+            result += "+------------------------------+---------------+------------------------------+\n\n"
                 
-            result += "\nMinimized DFA:\n\n"
-            result += f"States: {set(str(s) for s in self.current_min_dfa.states)}\n"
-            result += f"Alphabet: {self.current_min_dfa.alphabet}\n"
-            result += f"Start State: {str(self.current_min_dfa.start_state)}\n"
-            result += f"Final States: {set(str(s) for s in self.current_min_dfa.final_states)}\n"
-            result += "Transitions:\n"
-            for (state, symbol), next_state in self.current_min_dfa.transition_function.items():
-                result += f"  {str(state)} --{symbol}--> {str(next_state)}\n"
+            # Format Minimized DFA output
+            result += "Minimized DFA:\n\n"
+            result += f"States: {{{', '.join(format_state_set(s) for s in self.current_min_dfa.states)}}}\n"
+            result += f"Alphabet: {{{', '.join(sorted(self.current_min_dfa.alphabet))}}}\n"
+            result += f"Start State: {format_state_set(self.current_min_dfa.start_state)}\n"
+            result += f"Final States: {{{', '.join(format_state_set(s) for s in self.current_min_dfa.final_states)}}}\n\n"
+            
+            # Create transition table for minimized DFA
+            result += "Transition Table:\n"
+            # Header
+            result += "+------------------------------+---------------+------------------------------+\n"
+            result += "|          From State          |    Symbol    |           To State          |\n"
+            result += "+------------------------------+---------------+------------------------------+\n"
+            
+            # Sort transitions for better readability
+            sorted_min_transitions = sorted(self.current_min_dfa.transition_function.items(),
+                                         key=lambda x: (str(x[0][0]), x[0][1]))
+            
+            # Add transitions
+            for (state, symbol), next_state in sorted_min_transitions:
+                result += f"|{format_state_set(state):^30}|{symbol:^15}|{format_state_set(next_state):^30}|\n"
+            result += "+------------------------------+---------------+------------------------------+\n"
 
             self.result_text.delete(1.0, tk.END)
             self.result_text.insert(tk.END, result)
@@ -1016,7 +1256,7 @@ class NFAToDFAConverter:
         self.from_state.set('')
         self.symbol.set('')
         self.to_states.delete(0, tk.END)
-        
+
         # Clear current automata
         self.current_nfa = None
         self.current_dfa = None
@@ -1060,7 +1300,7 @@ class NFAToDFAConverter:
             
             # Update comboboxes
             self.update_comboboxes()
-            
+
             messagebox.showinfo("Success", "NFA constructed successfully from regular expression")
             
         except Exception as e:
