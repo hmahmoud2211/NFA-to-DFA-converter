@@ -110,11 +110,11 @@ class NFA:
                 
                 # Set edge style based on symbol type
                 if symbol == 'ε':
-                    edge_colors.append('#9E9E9E')  # Gray for ε-transitions
+                    edge_colors.append('#000000')  # Black for all transitions
                     edge_styles.append('dashed')
                 else:
-                    edge_colors.append('#2196F3')  # Blue for normal transitions
-                    edge_styles.append('solid')
+                    edge_colors.append('#000000')  # Black for all transitions
+                    edge_styles.append('dashed')
         
         # Create the plot
         plt.figure(figsize=(10, 6))
@@ -211,8 +211,8 @@ class DFA:
                 from_label = format_state_label(from_state)
                 to_label = format_state_label(to_state)
                 G.add_edge(from_label, to_label, label=symbol)
-                edge_colors.append('#2196F3')  # Blue for transitions
-                edge_styles.append('solid')
+                edge_colors.append('#000000')  # Black for all transitions
+                edge_styles.append('dashed')
         
         # Create the plot
         plt.figure(figsize=(12, 8))
@@ -1302,7 +1302,6 @@ class NFAToDFAConverter:
             self.update_comboboxes()
 
             messagebox.showinfo("Success", "NFA constructed successfully from regular expression")
-            
         except Exception as e:
             messagebox.showerror("Error", f"Error building NFA: {str(e)}")
 
