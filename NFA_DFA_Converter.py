@@ -1105,8 +1105,11 @@ class NFAToDFAConverter:
             transitions = {}
             for child in self.trans_tree.get_children():
                 values = self.trans_tree.item(child)['values']
-                key = (values[0], values[1])
-                to_states = set(s.strip() for s in values[2].split(','))
+                from_state = str(values[0]).strip()
+                symbol = str(values[1]).strip()
+                to_states_raw = str(values[2])
+                key = (from_state, symbol)
+                to_states = set(s.strip() for s in to_states_raw.split(',') if s.strip())
                 transitions[key] = to_states
 
             self.current_nfa = NFA(states, alphabet, transitions, start_state, final_states)
