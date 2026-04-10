@@ -280,10 +280,6 @@ class DFA:
         
         return plt.gcf()
     
-    def minimize(self):
-        """Minimize the DFA using Hopcroft's algorithm"""
-        return minimize_dfa(self)
-
 def nfa_to_dfa(nfa: NFA) -> DFA:
     """Convert NFA to DFA using subset construction algorithm"""
     # Get epsilon closure of start state
@@ -348,80 +344,6 @@ def nfa_to_dfa(nfa: NFA) -> DFA:
     new_finals = {state_map[s] for s in dfa_final_states}
 
     return DFA(new_states, dfa_alphabet, new_transitions, new_start, new_finals)
-
-def minimize_dfa(dfa: DFA) -> DFA:
-    """Minimize DFA using Hopcroft's algorithm"""
-    # Step 1: Create initial partition (final and non-final states)
-    final = frozenset(dfa.final_states)
-    non_final = frozenset(s for s in dfa.states if s not in dfa.final_states)
-    partitions = {final, non_final} if non_final else {final}
-    
-    # Remove empty sets
-    partitions = {p for p in partitions if p}
-    
-    # Step 2: Refine partitions until no more refinement is possible
-    while True:
-        new_partitions = set()
-        changed = False
-        
-        for partition in partitions:
-            # For each symbol in the alphabet
-            for symbol in dfa.alphabet:
-                # Group states by their transitions
-                transition_groups = {}
-                for state in partition:
-                    # Find which partition contains the destination state
-                    dest_state = dfa.transition_function.get((state, symbol))
-                    if dest_state is not None:
-                        dest_partition = None
-                        for p in partitions:
-                            if dest_state in p:
-                                dest_partition = p
-                                break
-                        # Group states by their destination partitions
-                        key = dest_partition
-                        if key not in transition_groups:
-                            transition_groups[key] = set()
-                        transition_groups[key].add(state)
-                
-                # If states were split into multiple groups
-                if len(transition_groups) > 1:
-                    new_partitions.update(frozenset(group) for group in transition_groups.values())
-                    changed = True
-                    break
-            if changed:
-                # Add remaining partitions
-                new_partitions.update(p for p in partitions if p != partition)
-                break
-        
-        if not changed:
-            break
-            
-        partitions = new_partitions
-    
-    # Step 3: Create the minimized DFA
-    # Create a mapping from old states to their partition representative
-    state_map = {}
-    for i, partition in enumerate(partitions):
-        rep = f"q{i}"  # Use simple state names
-        for state in partition:
-            state_map[state] = rep
-    
-    # Create new transition function
-    new_transitions = {}
-    for (state, symbol), next_state in dfa.transition_function.items():
-        new_state = state_map[state]
-        new_next = state_map[next_state]
-        new_transitions[(new_state, symbol)] = new_next
-    
-    # Create new states set
-    new_states = set(state_map.values())
-    
-    # Map start and final states
-    new_start = state_map[dfa.start_state]
-    new_finals = {state_map[s] for s in dfa.final_states}
-    
-    return DFA(new_states, dfa.alphabet, new_transitions, new_start, new_finals)
 
 class ThompsonNFA:
     """Class for building NFAs using Thompson's construction"""
@@ -659,7 +581,6 @@ class NFAToDFAConverter:
         
         self.current_nfa = None
         self.current_dfa = None
-        self.current_min_dfa = None
         
         self.create_widgets()
         self.root.mainloop()
@@ -844,7 +765,7 @@ class NFAToDFAConverter:
             ttk.Label(viz_control_frame, text="Select Automaton:", 
                      font=("Segoe UI", 11, "bold")).pack(side="left", padx=5)
             self.viz_type = ttk.Combobox(viz_control_frame, 
-                                        values=["NFA", "DFA", "Minimized DFA"], 
+                                        values=["NFA", "DFA"], 
                                         width=15, font=("Segoe UI", 10))
             self.viz_type.set("NFA")
             self.viz_type.pack(side="left", padx=5)
@@ -1114,7 +1035,6 @@ class NFAToDFAConverter:
 
             self.current_nfa = NFA(states, alphabet, transitions, start_state, final_states)
             self.current_dfa = nfa_to_dfa(self.current_nfa)
-            self.current_min_dfa = self.current_dfa.minimize()
 
             # Helper function to format state sets
             def format_state_set(state_set):
@@ -1142,29 +1062,6 @@ class NFAToDFAConverter:
             
             # Add transitions
             for (state, symbol), next_state in sorted_transitions:
-                result += f"|{format_state_set(state):^30}|{symbol:^15}|{format_state_set(next_state):^30}|\n"
-            result += "+------------------------------+---------------+------------------------------+\n\n"
-                
-            # Format Minimized DFA output
-            result += "Minimized DFA:\n\n"
-            result += f"States: {{{', '.join(format_state_set(s) for s in self.current_min_dfa.states)}}}\n"
-            result += f"Alphabet: {{{', '.join(sorted(self.current_min_dfa.alphabet))}}}\n"
-            result += f"Start State: {format_state_set(self.current_min_dfa.start_state)}\n"
-            result += f"Final States: {{{', '.join(format_state_set(s) for s in self.current_min_dfa.final_states)}}}\n\n"
-            
-            # Create transition table for minimized DFA
-            result += "Transition Table:\n"
-            # Header
-            result += "+------------------------------+---------------+------------------------------+\n"
-            result += "|          From State          |    Symbol    |           To State          |\n"
-            result += "+------------------------------+---------------+------------------------------+\n"
-            
-            # Sort transitions for better readability
-            sorted_min_transitions = sorted(self.current_min_dfa.transition_function.items(),
-                                         key=lambda x: (str(x[0][0]), x[0][1]))
-            
-            # Add transitions
-            for (state, symbol), next_state in sorted_min_transitions:
                 result += f"|{format_state_set(state):^30}|{symbol:^15}|{format_state_set(next_state):^30}|\n"
             result += "+------------------------------+---------------+------------------------------+\n"
 
@@ -1195,10 +1092,8 @@ class NFAToDFAConverter:
             viz_type = self.viz_type.get()
             if viz_type == "NFA":
                 fig = self.current_nfa.visualize("NFA Visualization")
-            elif viz_type == "DFA":
+            else:  # DFA
                 fig = self.current_dfa.visualize("DFA Visualization")
-            else:  # Minimized DFA
-                fig = self.current_min_dfa.visualize("Minimized DFA Visualization")
                 
             if fig:
                 canvas = FigureCanvasTkAgg(fig, master=self.viz_canvas_frame)
@@ -1220,22 +1115,22 @@ class NFAToDFAConverter:
             return
             
         try:
-            # Use the minimized DFA for testing
-            current_state = self.current_min_dfa.start_state
+            # Use the DFA for testing
+            current_state = self.current_dfa.start_state
             
             for symbol in test_str:
-                if symbol not in self.current_min_dfa.alphabet:
+                if symbol not in self.current_dfa.alphabet:
                     self.test_result.delete(1.0, tk.END)
                     self.test_result.insert(tk.END, f"String contains invalid symbol: {symbol}")
                     return
                     
-                current_state = self.current_min_dfa.transition_function.get((current_state, symbol))
+                current_state = self.current_dfa.transition_function.get((current_state, symbol))
                 if not current_state:
                     self.test_result.delete(1.0, tk.END)
                     self.test_result.insert(tk.END, f"String rejected: No transition for symbol '{symbol}' from state {current_state}")
                     return
             
-            if current_state in self.current_min_dfa.final_states:
+            if current_state in self.current_dfa.final_states:
                 self.test_result.delete(1.0, tk.END)
                 self.test_result.insert(tk.END, f"String accepted: {test_str}")
             else:
@@ -1263,7 +1158,6 @@ class NFAToDFAConverter:
         # Clear current automata
         self.current_nfa = None
         self.current_dfa = None
-        self.current_min_dfa = None
         
         # Clear visualization if available
         if VISUALIZATION_AVAILABLE and hasattr(self, 'viz_canvas_frame'):
